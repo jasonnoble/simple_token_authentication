@@ -8,7 +8,7 @@ module SimpleTokenAuthentication
     included do
       private :authenticate_entity_from_token!
       private :header_token_name
-      private :header_email_name
+      private :header_lookup_name
       # This is our new function that comes before Devise's one
       before_filter :authenticate_entity_from_token!
 
@@ -23,6 +23,9 @@ module SimpleTokenAuthentication
       self.method("authenticate_#{@@entity.name.singularize.underscore}!".to_sym).call
     end
 
+    def lookup_column
+      SimpleTokenAuthentication.lookup_column.underscore
+    end
 
     # For this example, we are simply using token authentication
     # via parameters. However, anyone could use Rails's token
@@ -30,22 +33,23 @@ module SimpleTokenAuthentication
     def authenticate_entity_from_token!
       # Set the authentication token params if not already present,
       # see http://stackoverflow.com/questions/11017348/rails-api-authentication-by-headers-token
+
       params_token_name = "#{@@entity.name.singularize.underscore}_token".to_sym
-      params_email_name = "#{@@entity.name.singularize.underscore}_email".to_sym
+      params_lookup_name = "#{@@entity.name.singularize.underscore}_#{lookup_column}".to_sym
       if token = params[params_token_name].blank? && request.headers[header_token_name]
         params[params_token_name] = token
       end
-      if email = params[params_email_name].blank? && request.headers[header_email_name]
-        params[params_email_name] = email
+      if lookup = params[params_lookup_name].blank? && request.headers[header_lookup_name]
+        params[params_lookup_name] = lookup
       end
 
-      email = params[params_email_name].presence
+      lookup = params[params_lookup_name].presence
       # See https://github.com/ryanb/cancan/blob/1.6.10/lib/cancan/controller_resource.rb#L108-L111
       entity = nil
       if @@entity.respond_to? "find_by"
-        entity = email && @@entity.find_by(email: email)
-      elsif @@entity.respond_to? "find_by_email"
-        entity = email && @@entity.find_by_email(email)
+        entity = lookup && @@entity.find_by(lookup_column.to_sym => lookup)
+      elsif @@entity.respond_to? "find_by_#{lookup_column}"
+        entity = lookup && @@entity.send("find_by_#{lookup_column}".to_sym, lookup)
       end
 
       # Notice how we use Devise.secure_compare to compare the token
@@ -73,12 +77,12 @@ module SimpleTokenAuthentication
       end
     end
 
-    # Private: Return the name of the header to watch for the email param
-    def header_email_name
+    # Private: Return the name of the header to watch for the lookup param
+    def header_lookup_name
       if SimpleTokenAuthentication.header_names["#{@@entity.name.singularize.underscore}".to_sym].presence
-        SimpleTokenAuthentication.header_names["#{@@entity.name.singularize.underscore}".to_sym][:email]
+        SimpleTokenAuthentication.header_names["#{@@entity.name.singularize.underscore}".to_sym][lookup_column.to_sym]
       else
-        "X-#{@@entity.name.singularize.camelize}-Email"
+        "X-#{@@entity.name.singularize.camelize}-#{lookup_column.camelize}"
       end
     end
 
