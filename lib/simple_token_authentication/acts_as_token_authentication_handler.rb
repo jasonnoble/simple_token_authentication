@@ -65,6 +65,9 @@ module SimpleTokenAuthentication
         # for every request. If you want the token to work as a
         # sign in token, you can simply remove store: false.
         sign_in entity, store: SimpleTokenAuthentication.sign_in_token
+        true
+      else
+        false
       end
     end
 
